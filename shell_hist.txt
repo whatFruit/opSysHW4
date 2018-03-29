@@ -1,0 +1,11 @@
+hello there
+this is
+a test of history and 
+time
+exit
+newfs rwe 2048
+exit
+newfs rwe 2048
+exit
+newfs rwe 2048
+exit
