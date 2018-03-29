@@ -470,7 +470,7 @@ def test_free_inode():
 
 #=============|As. 3mnbbm|=====================
 
-def test_free_inode():
+def test_write_and_read():
     FileSystem.createFileSystem("testVI", 2048, 2048)
     testFS = FileSystem.mount("testV.2048.dev")
 
