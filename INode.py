@@ -15,7 +15,7 @@ class INode:
     default_flags_inode = INodeType.FREE
     default_perms = 777
     default_level = 1
-    default_length = 0
+    default_length = 2048
     default_MagicNumber = 5000
 
     def __init__(self, parentFS,
@@ -48,7 +48,7 @@ class INode:
     #    If the user reads from a block that is in the file, but doesn't have
     #    a block allocated to it, just copy 0-bytes to the buffer for that block
 
-    def read(self, file_offset: int, buffer):
+    def read(self,buffer, file_offset: int):
         """
         Read from this INode into buffer
 
@@ -83,7 +83,7 @@ class INode:
     #     Similarly tricky as read, except when you look up blocks, pass the
     #     alloc = True flag to getDiskAddrOfBlock, so that the block does get
     #     allocated.
-    def write(self, file_offset: int, buffer):
+    def write(self, buffer, file_offset: int):
         """
         Write buffer to INode @ file_offset
 

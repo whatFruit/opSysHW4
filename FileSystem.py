@@ -2,6 +2,7 @@ import os
 import BlockDevice
 import struct
 import numpy as np
+from File import *
 from INode import *
 from enum import Enum
 
@@ -48,6 +49,7 @@ class FileSystem:
         self.inodeMap = InodeMap(self)
         self.blockCache = {}
         self.rBlockDev = None
+        self.currentDir = None
     #load block from cache, load into cache if not availble
     def retrieveBlock(self,blockNum,dirty=False):
 
@@ -74,6 +76,7 @@ class FileSystem:
         newFS.rBlockDev.num_blocks = newFS.masterBlock.blockCount
         newFS.blockMap.unpack(newFS.rBlockDev)
         newFS.inodeMap.unpack(newFS.rBlockDev)
+        newFS.currentDir = Directory(newFS.inodeMap.inodeMap[newFS.masterBlock.rootDirAddress],None)
         return newFS
 
     def unmount(self,softUnmount = False):
@@ -101,11 +104,28 @@ class FileSystem:
         :param path: path of a file or directory
         :return: INode structure
         """
-        ret = None
-        # start cwd <- root_dir,
-        # iterate through elements of path,
-        # finding a child of the current directory whose name matches, updating cwd as you go
-        return ret
+        retNode = self.currentDir.inode
+        retParent = self.currentDir.parent
+
+        if(path is None):
+            print("path is none")
+            return retNode, retParent
+
+        pathList = path.split("/")
+        for word in pathList:
+            if not retNode.isDirectoy:
+                print("Error: part in path is not a directory")
+                return None, None
+            searchDir = Directory(retNode,retParent)
+            sResult = searchDir.get_children()
+            if word in sResult:
+                retParent = retNode
+                retNode = sResult[word].inode
+            else:
+                print("Error: part in path does not exist")
+                return None, None
+
+        return retNode,retParent
 
     # ========User Functions==========
 
@@ -120,6 +140,93 @@ class FileSystem:
         :param mode:   "r", "w", or "a"
         :return:       File object, or None if there is no such file (or it's a directory)
         """
+        fileInode, fileParent = self.namei(path)
+        if fileInode is None:
+            return None
+        if not fileInode.isFile():
+            print("Error: file to read from is actually a directory")
+            return None
+        return File(fileInode, fileParent)
+
+    def splitPathName(self,path):
+        pathList = path.split("/")
+        newPath = "/".join(pathList[:-1])
+        if newPath == '':
+            return None, (pathList[-1:])[0]
+        return newPath, (pathList[-1:])[0]
+
+    def printDir(self,path = None):
+        dirInode, dirParent = self.namei(path)
+        if dirInode is None:
+            return
+        if not dirInode.isDirectory():
+            print("Error: directory is actually a file")
+            return
+        print("|||dirInode: " + str(dirInode.inodeNum))
+        if(dirParent is not None):
+            print("parentInode:" + str(dirParent))
+        dir = Directory(dirInode, dirParent)
+        print("ls Test")
+        print(dir.get_children())
+        for key in dir.get_children():
+            print("ls Test2")
+            print(key)
+
+    def printFile(self,path, length = 100):
+        file = self.open(path,"r")
+        if file is None:
+            return
+        readBuffer = bytearray(length)
+        file.read(bytearray(length))
+        print(readBuffer.decode("utf-8"))
+
+    def writeFile(self,path, message, offset=-1):
+        file = self.open(path,"w")
+        if file is None:
+            return
+        if offset != -1:
+            file.seek(offset)
+        file.write(message.encode("utf-8"))
+
+    def makeFSObj(self, path, newType):
+        newPath, name = self.splitPathName(path)
+        dirInode, dirParent = self.namei(newPath)
+        print("dirInode: " + str(dirInode.inodeNum))
+        if(dirParent is not None):
+            print("parentInode:" + str(dirParent))
+        if dirInode is None:
+            return
+        if not dirInode.isDirectory():
+            print("Error: directory is actually a file")
+            return
+        dir = Directory(dirInode, dirParent)
+        dirChildren = dir.get_children()
+        if dirChildren:
+            if name in dirChildren:
+                print("Error: file or directory  with that name already exists")
+                return
+        allocInode = self.inodeMap.inodeMap[self.inodeMap.allocateInode(newType)]
+        print("alloc: " + str(allocInode.inodeNum))
+        dir.add_child(name, allocInode)
+        if newType == "d":
+            dir = Directory(allocInode, dir.inode)
+            dir.add_child(".", dir.inode)
+            dir.add_child("..", dir.parent)
+
+    def makeDir(self,path):
+        self.makeFSObj(path, "d")
+
+    def makeFile(self,path):
+        self.makeFSObj(path, "f")
+
+    def moveCurrDir(self,path):
+        dirInode, dirParent = self.namei(path)
+        if dirInode is None:
+            return
+        if not dirInode.isDirectory():
+            print("Error: directory is actually a file")
+            return
+        self.currentDir = Directory(dirInode, dirParent)
 
     def printBlockMap(self):
         self.blockMap.printBlockMap()
@@ -169,11 +276,10 @@ class MasterBlock:
         self.blockCount = blockcount
         self.inodeCount = int(inodecount)
         self.blockMapAddress = blockmapaddress
-        self.inodeMapAddress = inodemapaddress
-        self.rootDirAddress = rootdiraddress
         self.flags = flag
         self.blockMapBlockCount = cielDiv(cielDiv(self.blockCount, 8), self.blockSize)
         self.inodeMapAddress = self.blockMapAddress + self.blockMapBlockCount
+        self.rootDirAddress = 0
 
     def pack(self):
         return bytearray(struct.pack("=ihihiiic",
@@ -308,6 +414,7 @@ class InodeMap:
         self.parentFS = parentFS
         self.masterBlock = self.parentFS.masterBlock
         self.inodeMap = [INode(parentFS, x) for x in range(self.masterBlock.inodeCount)]
+        self.setInode(self.masterBlock.rootDirAddress, INodeType.DIRECTORY)
 
     def setInode(self, inodeID, newState):
         if (inodeID > self.masterBlock.inodeCount):
@@ -482,7 +589,7 @@ def test_write_and_read():
 
     testWrite = "A cat is Here".encode('ascii')
 
-    testInode.write(27124,testWrite)
+    testInode.write(testWrite, 27124)
 
     testFS.unmount()
 
@@ -490,7 +597,7 @@ def test_write_and_read():
 
     testRead = bytearray(len("A cat is Here"))
 
-    testInode.read(27124, testRead)
+    testInode.read(testRead, 27124)
 
 
     assert str(testRead.decode("ascii")) == "A cat is Here"

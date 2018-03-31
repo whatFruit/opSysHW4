@@ -31,20 +31,53 @@ def repl():
         elif words[0] in ('exit', 'quit'):
             break
         elif words[0] in ('ls', 'dir'):
-            print("show current directory's contents")
+            if numWords > 2:
+                print("Error: ls - requires one or zero arguments: 'ls [directoy/path]'")
+            elif fileSys is None:
+                print("Error: ls - a fileSys must be mounted first '")
+            elif numWords == 1:
+                fileSys.printDir()
+            else:
+                fileSys.printDir(words[1])
         elif words[0] == 'cat':
-            print("if argument is a file, print it, else report a nice error")
+            if numWords != 2:
+                print("Error: cat - requires one argument: 'cat <filename>'")
+            elif fileSys is None:
+                print("Error: cat - a fileSys must be mounted first '")
+            else:
+                fileSys.printFile(words[1])
+        elif words[0] == 'write':
+            if numWords != 3 or  numWords != 4:
+                print("Error: write - requires two arguments: 'write <filename> <message> (offset)'")
+            elif fileSys is None:
+                print("Error: write - a fileSys must be mounted first '")
+            elif numWords == 3:
+                fileSys.writeFile(words[1],words[2],-1)
+            else:
+                fileSys.writeFile(words[1], words[2],words[3])
         elif words[0] == 'mkdir':
-            print("create an empty directory goes here")
+            if numWords != 2:
+                print("Error: mkdir - requires one argument: 'mkdir <dirName>'")
+            elif fileSys is None:
+                print("Error: mkdir - a fileSys must be mounted first '")
+            else:
+                fileSys.makeDir(words[1])
         elif words[0] == 'touch':
-            print("create an empty file goes here")
+            if numWords != 2:
+                print("Error: touch - requires one argument: 'cd <filename>'")
+            elif fileSys is None:
+                print("Error: touch - a fileSys must be mounted first '")
+            else:
+                fileSys.makeFile(words[1])
         elif words[0] == 'cd':
-            print("cd implementation goes here")
+            if numWords != 2:
+                print("Error: cd - requires one argument: 'cd <path>'")
+            elif fileSys is None:
+                print("Error: cd - a fileSys must be mounted first '")
+            else:
+                fileSys.moveCurrDir(words[1])
         elif words[0] == 'echo':
-            print("echo implementation goes here")
-        elif words[0] == 'pwd':
-            print("pwd implementation goes here")
-        # ===============Whats being implemented for this assingment==========#
+            print(*words[1:]," ")
         elif words[0] == 'newfs':
             # Creates a file system given the correct arguments, error msg otherwise
             if numWords < 3 or numWords > 4:

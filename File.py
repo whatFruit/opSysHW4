@@ -29,6 +29,7 @@ class File(object):
         self.offset = offset
         self.parent = parent
 
+
     def read(self, buff):
         num_read = self.inode.read(self.offset, buff)
         self.offset += num_read
@@ -39,8 +40,8 @@ class File(object):
         self.offset += len(buff)
 
     def seek(self, pos, from_what = FileSeek.BEGINNING):
-        # if we didn't have from_what, it would just be:
-        # self.offset = pos
+        #if we didn't have from_what, it would just be:
+        self.offset = from_what + pos
         pass
 
     def sync(self):
@@ -63,18 +64,20 @@ class Directory(File):
 
     def add_child(self, child_name, child_inode:INode):
         child = None
+        print(child_inode.flags)
         if child_inode == None:
             assert False, "missing iNode in add_child"
-        elif child_inode.type == INodeType.FILE:
+        elif child_inode.isFile():
             child = File(child_inode, self)
-        elif child_inode.type == INodeType.DIRECTORY:
+        elif child_inode.isDirectory():
             child = Directory(child_inode, self)
         else:
-            assert False, "unknown inode type in add_child: {}".format(child_inode.type)
+            assert False, "unknown inode type in add_child"
         # todo: what are the conditions where we need to check this?
         # do we have any invariants wrt. directories being cached?
         self.ensure_cached()
         self.children[child_name] = child
+        self.flush()
 
     def get_children(self):
         self.ensure_cached()
@@ -91,7 +94,7 @@ class Directory(File):
         for key in self.children.keys():
             kid = self.children[key]
             # print("dir sync key:{}->{}".format(key, str(kid)))
-            strbuf = strbuf + "\n{}|{}".format(key, self.children[key].inode.number)
+            strbuf = strbuf + "\n{}|{}".format(key, self.children[key].inode.inodeNum)
         # print(strbuf)
         return strbuf
 
@@ -104,13 +107,15 @@ class Directory(File):
         # print("syncing dir, {} bytes".format(str(len(byte_buff))))
 
     def ensure_cached(self):
+        print("ensuring")
         if self.children == None:
+            print("ensuring NONE")
             self.read()
 
     def read(self):
         """ Read the directory from its iNode's contents """
         # print("fetching dir, {} bytes".format(str(self.inode.num_bytes)))
-        buff = bytearray(self.inode.num_bytes)
+        buff = bytearray(self.inode.length)
         self.inode.read(buff, 0) # read the whole file
         dir_as_string = buff.decode("utf-8")
         child_pipe_inode = dir_as_string.split("\n")
