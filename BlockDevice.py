@@ -97,6 +97,7 @@ class BlockDevice:
         """
         assert block_num < self.num_blocks, "read_block past end of device"
         assert len(buff) == self.blocksize, "bad buff size to read_block"
+        #print("read_Block, block_num: " + str(block_num) + " ; " + str(block_num * self.blocksize))
         self.handle.seek(block_num * self.blocksize)
         num_read = self.handle.readinto(buff)
         assert num_read == self.blocksize, "ERROR: read_block buffer / file not block aligned"

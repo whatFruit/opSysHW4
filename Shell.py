@@ -41,20 +41,25 @@ def repl():
                 fileSys.printDir(words[1])
         elif words[0] == 'cat':
             if numWords != 2:
-                print("Error: cat - requires one argument: 'cat <filename>'")
+                print("Error: cat - requires one or two arguments: 'cat <filename> (offset)'")
             elif fileSys is None:
                 print("Error: cat - a fileSys must be mounted first '")
             else:
                 fileSys.printFile(words[1])
         elif words[0] == 'write':
-            if numWords != 3 or  numWords != 4:
-                print("Error: write - requires two arguments: 'write <filename> <message> (offset)'")
+            if numWords < 3:
+                print("Error: write - requires two arguments: 'write <filename> <message>'")
             elif fileSys is None:
                 print("Error: write - a fileSys must be mounted first '")
-            elif numWords == 3:
-                fileSys.writeFile(words[1],words[2],-1)
             else:
-                fileSys.writeFile(words[1], words[2],words[3])
+                fileSys.writeFile(words[1]," ".join(words[2:]), -1)
+        elif words[0] == 'write_at':
+            if numWords < 4:
+                print("Error: write_at - requires two arguments: 'write <filename> <offset> <message>'")
+            elif fileSys is None:
+                print("Error: write_at - a fileSys must be mounted first '")
+            else:
+                fileSys.writeFile(words[1]," ".join(words[3:]), int(words[2]))
         elif words[0] == 'mkdir':
             if numWords != 2:
                 print("Error: mkdir - requires one argument: 'mkdir <dirName>'")
@@ -64,7 +69,7 @@ def repl():
                 fileSys.makeDir(words[1])
         elif words[0] == 'touch':
             if numWords != 2:
-                print("Error: touch - requires one argument: 'cd <filename>'")
+                print("Error: touch -requires one argument: 'cd <filename>'")
             elif fileSys is None:
                 print("Error: touch - a fileSys must be mounted first '")
             else:

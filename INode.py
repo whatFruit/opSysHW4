@@ -14,7 +14,7 @@ class INode:
     default_date = 777
     default_flags_inode = INodeType.FREE
     default_perms = 777
-    default_level = 1
+    default_level = 0
     default_length = 2048
     default_MagicNumber = 5000
 
@@ -56,13 +56,13 @@ class INode:
         :param buffer:      read up to len(buffer) bytes into this buffer
         :return:            number of bytes successfully read
         """
-
         startingOffset = file_offset
         offset = file_offset
         endOffset = startingOffset + len(buffer)
         bp = 0
-
+        #print("reead~; length: " + str(self.length) + "." )
         while endOffset-offset != 0:
+            #print("endOf: " + str(endOffset) + " ; offset: " + str(offset))
             blockIndex = offset // self.masterBlock.blockSize
             readIndex = blockIndex*self.masterBlock.blockSize
             startWriteAt = 0
@@ -75,9 +75,12 @@ class INode:
             dataBlock = self.parentFS.retrieveBlock(dataBlockAddr)
             for i in range(restOfBlock-startWriteAt):
                 buffer[bp*self.masterBlock.blockSize + i] = dataBlock[startWriteAt + i]
+            #print("pre-cache")
             self.parentFS.cacheBlock(dataBlockAddr,dataBlock)
             offset = offset + (restOfBlock-startWriteAt)
             bp += 1
+
+        #print("Reading from inode: " + str(self.inodeNum) + " with msg: " + str(buffer.decode("utf-8")) + " |||")
 
     # TODO: Assignment 3.2
     #     Similarly tricky as read, except when you look up blocks, pass the
@@ -91,7 +94,7 @@ class INode:
         :param buffer:       write these bytes to the file
         :return:             number of bytes written
         """
-
+        #print("Writing to inode: " + str(self.inodeNum) + " with msg: " + str(buffer.decode("utf-8")) + " |||")
         startingOffset = file_offset
         offset = file_offset
         endOffset = startingOffset + len(buffer)
@@ -124,6 +127,7 @@ class INode:
         blockOfPtrs = bytearray(0)
         for x in range(0,self.ptrsPerBlock):
             blockOfPtrs.extend(struct.pack("=i", ptrsToPack[x]))
+        #print("writing block of pointers at: " + str(blockNum))
         self.parentFS.cacheBlock(blockNum,blockOfPtrs)
         return
 
@@ -148,6 +152,7 @@ class INode:
         # TODO  Perserve existing block pointers when inode length increased
         # TODO: mark any allocated blocks in the truncated range
         #       as free if we shorten the inode
+        #print("truncating")
         self.length = len
 
     ########### Internal functions
@@ -190,17 +195,13 @@ class INode:
                print("Error: getDiskAddrOfBlock: attempted access beyond inode size")
                return -1
             if blocks[blockNumber] == 0:
-                if alloc:
-                    blocks[blockNumber] = self.parentFS.allocBlock()
-                    if (blocksBlockPtr == 0):
-                        self.blockPtrs = blocks  # top level inode blocks
-                    else:
-                        self.writeBlockOfPtrs(blocksBlockPtr,blocks)
-                    return blocks[blockNumber]
+                blocks[blockNumber] = self.parentFS.allocBlock()
+                if (blocksBlockPtr == 0):
+                    self.blockPtrs = blocks  # top level inode blocks
                 else:
-                    return -1
+                    self.writeBlockOfPtrs(blocksBlockPtr,blocks)
+                return blocks[blockNumber]
             return blocks[blockNumber]
-
 
         ptrsPerPtr = self.ptrsPerBlock**level
         newBlockIndex = blockNumber//ptrsPerPtr

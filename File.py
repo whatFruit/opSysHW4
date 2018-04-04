@@ -31,17 +31,21 @@ class File(object):
 
 
     def read(self, buff):
-        num_read = self.inode.read(self.offset, buff)
-        self.offset += num_read
-        return num_read
+        self.inode.read(buff,self.offset)
+        return len(buff)
 
     def write(self, buff):
-        self.inode.write(self.offset, buff)
+        self.inode.write(buff,self.offset)
         self.offset += len(buff)
+        return len(buff)
 
     def seek(self, pos, from_what = FileSeek.BEGINNING):
-        #if we didn't have from_what, it would just be:
-        self.offset = from_what + pos
+        if from_what == FileSeek.BEGINNING:
+            self.offset = pos
+        elif from_what == FileSeek.CURRENT:
+            self.offset += pos
+        elif from_what == FileSeek.END:
+            self.offset = self.inode.length - pos
         pass
 
     def sync(self):
@@ -64,7 +68,7 @@ class Directory(File):
 
     def add_child(self, child_name, child_inode:INode):
         child = None
-        print(child_inode.flags)
+        #print("adding child(" + str(child_inode.inodeNum) + ") to: " + str(self.inode.inodeNum) + ".")
         if child_inode == None:
             assert False, "missing iNode in add_child"
         elif child_inode.isFile():
@@ -77,6 +81,7 @@ class Directory(File):
         # do we have any invariants wrt. directories being cached?
         self.ensure_cached()
         self.children[child_name] = child
+        #print("Just added a child(" + child_name + " ): to inode" + str(self.inode.inodeNum) + " ; " + str(self.children))
         self.flush()
 
     def get_children(self):
@@ -93,9 +98,8 @@ class Directory(File):
         strbuf = ''
         for key in self.children.keys():
             kid = self.children[key]
-            # print("dir sync key:{}->{}".format(key, str(kid)))
+            #print("dir sync key:{}->{}".format(key, str(kid)))
             strbuf = strbuf + "\n{}|{}".format(key, self.children[key].inode.inodeNum)
-        # print(strbuf)
         return strbuf
 
     def flush(self):
@@ -104,28 +108,30 @@ class Directory(File):
         strbuf = self.to_str()
         byte_buff = bytearray(strbuf, "utf-8")
         self.inode.write(byte_buff, 0)
-        # print("syncing dir, {} bytes".format(str(len(byte_buff))))
+        #print("syncing dir, {} bytes".format(str(len(byte_buff))))
 
     def ensure_cached(self):
-        print("ensuring")
-        if self.children == None:
-            print("ensuring NONE")
-            self.read()
+        self.read()
 
     def read(self):
         """ Read the directory from its iNode's contents """
         # print("fetching dir, {} bytes".format(str(self.inode.num_bytes)))
         buff = bytearray(self.inode.length)
+        #print("buff length: " + str(len(buff)))
         self.inode.read(buff, 0) # read the whole file
         dir_as_string = buff.decode("utf-8")
+        if dir_as_string == bytearray(self.inode.length):
+            print("empty dir read")
+            return
+        #print("raw read: " + dir_as_string)
         child_pipe_inode = dir_as_string.split("\n")
         self.children = {}
-        # print("unmarshalling directory {}".format(dir_as_string))
+        #print("unmarshalling directory {}".format(dir_as_string))
         for child in child_pipe_inode:
-            if len(child) == 0: continue
-            # print("unmarshaling {} ({})".format(child, len(child)))
+            #print("unmarshaling {} ({})".format(child, len(child)))
             entry = child.split("|")
-            child_obj = inode_to_object(self.inode.filesystem, int(entry[1]), self)
+            if len(entry) != 2: continue
+            child_obj = inode_to_object(self.inode.parentFS, self.inode.parentFS.inodeMap.inodeMap[int(entry[1].rstrip(' \t\r\n\0'))], self)
             self.children[entry[0]] = child_obj
 
     def sync(self):

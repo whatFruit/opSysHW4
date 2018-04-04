@@ -59,10 +59,12 @@ class FileSystem:
             self.blockCache[blockNum] = (retBlock, dirty)
         if (not(self.blockCache[blockNum])[1]) and dirty:
             self.blockCache[blockNum] = ((self.blockCache[blockNum])[0],dirty)
+        #print("read update: blocknum :" + str(blockNum) + " block: " + str((self.blockCache[blockNum])[0].decode("utf-8")))
         return (self.blockCache[blockNum])[0]
 
     def cacheBlock(self,blockNum,block):
         self.blockCache[blockNum] = (block,True)
+        #print("write update: blocknum :" + str(blockNum) + " block: " + str(block.decode("utf-8")))
         return
 
     @staticmethod
@@ -108,12 +110,12 @@ class FileSystem:
         retParent = self.currentDir.parent
 
         if(path is None):
-            print("path is none")
+            #print("path is none")
             return retNode, retParent
 
         pathList = path.split("/")
         for word in pathList:
-            if not retNode.isDirectoy:
+            if not retNode.isDirectory():
                 print("Error: part in path is not a directory")
                 return None, None
             searchDir = Directory(retNode,retParent)
@@ -162,22 +164,22 @@ class FileSystem:
         if not dirInode.isDirectory():
             print("Error: directory is actually a file")
             return
-        print("|||dirInode: " + str(dirInode.inodeNum))
-        if(dirParent is not None):
-            print("parentInode:" + str(dirParent))
+        #print("|||dirInode: " + str(dirInode.inodeNum))
+        #if(dirParent is not None):
+            #print("parentInode:" + str(dirParent))
         dir = Directory(dirInode, dirParent)
-        print("ls Test")
-        print(dir.get_children())
+        #print("PrintDir inode: " + str(dir.inode.inodeNum))
+        dirList = ""
         for key in dir.get_children():
-            print("ls Test2")
-            print(key)
+            dirList = dirList + " " + key
+        print(dirList)
 
-    def printFile(self,path, length = 100):
+    def printFile(self,path):
         file = self.open(path,"r")
         if file is None:
             return
-        readBuffer = bytearray(length)
-        file.read(bytearray(length))
+        readBuffer = bytearray(file.inode.length)
+        file.read(readBuffer)
         print(readBuffer.decode("utf-8"))
 
     def writeFile(self,path, message, offset=-1):
@@ -187,13 +189,14 @@ class FileSystem:
         if offset != -1:
             file.seek(offset)
         file.write(message.encode("utf-8"))
+        file.seek(0)
 
     def makeFSObj(self, path, newType):
         newPath, name = self.splitPathName(path)
         dirInode, dirParent = self.namei(newPath)
-        print("dirInode: " + str(dirInode.inodeNum))
-        if(dirParent is not None):
-            print("parentInode:" + str(dirParent))
+        #print("dirInode: " + str(dirInode.inodeNum))
+        #if(dirParent is not None):
+        #    print("parentInode:" + str(dirParent))
         if dirInode is None:
             return
         if not dirInode.isDirectory():
@@ -206,7 +209,7 @@ class FileSystem:
                 print("Error: file or directory  with that name already exists")
                 return
         allocInode = self.inodeMap.inodeMap[self.inodeMap.allocateInode(newType)]
-        print("alloc: " + str(allocInode.inodeNum))
+        #print("alloc: " + str(allocInode.inodeNum))
         dir.add_child(name, allocInode)
         if newType == "d":
             dir = Directory(allocInode, dir.inode)
@@ -464,7 +467,7 @@ class InodeMap:
         """
         printStr = ""
         for x in range(self.masterBlock.inodeCount):
-            printStr = printStr + chr(self.inodeMap[x].flags)
+            printStr = printStr + chr(self.inodeMap[x].flags.value)
             if (x + 1) % 8 == 0:
                 printStr = printStr + "|"
             if (x + 1) % 64 == 0:
